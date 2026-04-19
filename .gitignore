@@ -37,5 +37,7 @@ Thumbs.db
 
 # PyInstaller (KREAM_BASE 잔재 방지)
 *.spec
-build/
 dist/
+# PyInstaller 출력물은 무시하되, build/pyinstaller/ build/docker/ 같은 설정 폴더는 허용
+build/**/build/
+build/**/dist/

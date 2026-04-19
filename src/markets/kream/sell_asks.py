@@ -79,6 +79,11 @@ def 내_판매입찰_목록(상태_필터: Optional[str] = None) -> list[dict]:
 
 
 def _내_판매입찰_단일페이지(페이지: int) -> list[dict]:
+    """단일 페이지 조회. 다음 페이지가 없으면 빈 리스트.
+
+    KREAM 은 범위 밖 커서에 대해 404 Not Found 를 반환한다 (규격상 이상하지만
+    실측 확인). 이를 '페이지 없음' 신호로 해석. 다른 에러는 그대로 전파.
+    """
     params = {
         "per_page": str(_PAGE_SIZE),
         "cursor": 페이지,
@@ -86,6 +91,11 @@ def _내_판매입찰_단일페이지(페이지: int) -> list[dict]:
         "end_date": "2050-12-31",
     }
     response = http.get(_URL_ASKS_BIDDING, params=params)
+
+    # KREAM: 범위 초과 커서 → 404 ("더 이상 없음" 신호로 간주)
+    if response.status_code == 404:
+        return []
+
     response.raise_for_status()
     data = response.json()
     items = data.get("items") or []

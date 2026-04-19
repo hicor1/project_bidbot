@@ -1,0 +1,37 @@
+name: Phase A - KREAM 이메일 로그인 테스트
+
+on:
+  workflow_dispatch:
+
+jobs:
+  login-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Show runner IP (참고용)
+        run: |
+          echo "runner egress IP:"
+          curl -s https://api.ipify.org || true
+          echo
+
+      - name: Run Phase A login test
+        env:
+          KREAM_EMAIL: ${{ secrets.KREAM_EMAIL }}
+          KREAM_PW:    ${{ secrets.KREAM_PW }}
+        working-directory: test/phase_a_kream_login
+        run: python -u run_phase_a.py

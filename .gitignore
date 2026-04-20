@@ -24,6 +24,9 @@ logs/
 *.xlsx
 *.xlsm
 *.csv
+# 예외: docs/ 하위 템플릿·샘플은 공유 대상
+!docs/*.xlsx
+!docs/*.csv
 
 # IDE
 .vscode/

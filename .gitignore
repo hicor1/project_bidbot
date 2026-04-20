@@ -16,6 +16,14 @@ credentials.json
 token.json
 *.key
 *.pem
+# 구글 서비스 계정 JSON — 형식/위치 상관없이 전부 차단
+*service-account*.json
+*service_account*.json
+project-bitbot-*.json
+# secret/ 이라는 이름 붙은 폴더는 어디에 있든 통째 차단
+**/secret/
+**/secrets/
+**/.secret/
 
 # 로그 / 출력물
 로그/

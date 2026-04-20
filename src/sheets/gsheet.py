@@ -145,3 +145,103 @@ def validate_headers(headers: list[str]) -> list[str]:
         messages.append(f"기대 외 추가 열 {len(extras)}개: {extras}")
 
     return messages
+
+
+# ─────────────────────────────────────────────────────────────
+# 쓰기 — 봇 영역(K~P)만 허용. 사람 영역 쓰기는 코드 차원에서 차단.
+# ─────────────────────────────────────────────────────────────
+_BOT_COLUMN_NAME_SET = set(schema.BOT_COLUMN_NAMES)
+
+
+def _col_letter(col_index_1based: int) -> str:
+    """1 → A, 2 → B, ..., 26 → Z, 27 → AA 변환."""
+    letters = ""
+    n = col_index_1based
+    while n > 0:
+        n, rem = divmod(n - 1, 26)
+        letters = chr(ord("A") + rem) + letters
+    return letters
+
+
+def _validate_bot_write(row_number: int, values: dict) -> None:
+    """쓰기 요청이 안전한지 검증. 위반 시 즉시 예외.
+
+    - 헤더 행(1,2) 쓰기 금지
+    - 사람 영역 컬럼 쓰기 금지
+    """
+    if row_number < schema.DATA_START_ROW:
+        raise ValueError(
+            f"row_number={row_number} 는 데이터 영역 아님 "
+            f"(DATA_START_ROW={schema.DATA_START_ROW}). 1행 안내/2행 헤더 보호."
+        )
+    for col_name in values.keys():
+        if col_name not in _BOT_COLUMN_NAME_SET:
+            raise ValueError(
+                f"'{col_name}' 은 봇 쓰기 허용 컬럼이 아닙니다. "
+                f"허용: {schema.BOT_COLUMN_NAMES}"
+            )
+
+
+def _format_value(value) -> str:
+    """시트에 쓸 때 gspread 가 해석 못 하는 값 방지."""
+    if value is None:
+        return ""
+    return value  # gspread 가 str/int/float 받음
+
+
+def update_row_bot_cells(
+    worksheet: gspread.Worksheet,
+    row_number: int,
+    values: dict,
+) -> None:
+    """지정 행의 봇 영역 셀 여러 개를 한 번에 갱신.
+
+    worksheet: gspread.Worksheet
+    row_number: 1-based 시트 행 번호 (>= DATA_START_ROW)
+    values: {컬럼명: 새값} — 컬럼명은 schema.BOT_COLUMN_NAMES 중 하나여야 함
+
+    예:
+        update_row_bot_cells(ws, 3, {
+            "공급가(=하한가)": 125300,
+            "크림상태": "정상",
+            "갱신일": "2026-04-20 10:30",
+        })
+    """
+    _validate_bot_write(row_number, values)
+    if not values:
+        return
+
+    data = []
+    for col_name, v in values.items():
+        col_idx = schema._col_index(col_name)  # 1-based
+        cell = f"{_col_letter(col_idx)}{row_number}"
+        data.append({"range": cell, "values": [[_format_value(v)]]})
+
+    worksheet.batch_update(data, value_input_option="USER_ENTERED")
+
+
+def update_many_rows_bot_cells(
+    worksheet: gspread.Worksheet,
+    updates: list,
+) -> None:
+    """여러 행의 봇 셀 업데이트를 하나의 batch 로.
+
+    updates: [(row_number, {컬럼명: 값, ...}), ...]
+
+    모든 row 가 검증 통과해야 send. 하나라도 위반이면 아무것도 안 씀.
+    """
+    # 1) 전 검증
+    for row_number, values in updates:
+        _validate_bot_write(row_number, values)
+
+    # 2) 요청 구성
+    data = []
+    for row_number, values in updates:
+        for col_name, v in values.items():
+            col_idx = schema._col_index(col_name)
+            cell = f"{_col_letter(col_idx)}{row_number}"
+            data.append({"range": cell, "values": [[_format_value(v)]]})
+
+    if not data:
+        return
+    worksheet.batch_update(data, value_input_option="USER_ENTERED")
